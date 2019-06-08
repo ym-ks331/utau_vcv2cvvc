@@ -2,6 +2,7 @@
 
 import logging
 import re
+import sys
 
 LOG = logging.getLogger()
 LOG.setLevel(logging.WARN)
@@ -13,12 +14,12 @@ formatter = logging.Formatter(logformat)
 fh.setFormatter(formatter)
 LOG.addHandler(fh)
 
-def main():
+def main(inputfile):
 
     oc = OtoConverter()
 
-    with open("oto_vcv.ini", "r", encoding="sjis") as f:
-        with open("newoto.ini", "w", encoding="sjis") as f_out:
+    with open(inputfile, "r", encoding="sjis") as f:
+        with open("oto_cvvc.ini", "w", encoding="sjis") as f_out:
 
             for line in f:
                 wavfile, params = line.split("=")
@@ -41,13 +42,14 @@ def main():
                 # v-cvのc部分取り出す
                 c = oc.change_alias(cv)
 
-                if c == "nai":
+                if c is None:
                     LOG.warning("変換できませんでした: {}".format(alias))
                     f_out.write(line)
                     continue
 
-                if c == " ":
+                elif c == " ":
                     vc = cv
+
                 else:
                     vc="{} {}".format(v, c)
 
@@ -55,9 +57,11 @@ def main():
 
                 if (vcl[1]==-1 and vcl[2] == -1):
                     f_out.write(line)
+                    
                     continue
+
                 # 母音の場合 -> そのまま出力 + V
-                if is_vowel(vc):
+                if is_vowel(cv):
                     f_out.write(line)
                     
                 else:
@@ -71,9 +75,7 @@ def main():
                     out_ = set_oto_line(wavfile,vc,n_offset,n_cons,n_blank,n_pre,n_ovl)
                     f_out.write(out_)
 
-            
-                CV = alias.split(" ")[1]
-                cvl = oc.get_vclength(CV)
+                cvl = oc.get_vclength(cv)
                 
                 # CV
                 n_offset = round(offset + pre - cvl[2])
@@ -90,7 +92,7 @@ def main():
                 n_pre = round((pre) - left)
                 n_ovl = round(cvl[3])
                 
-                out_ = set_oto_line(wavfile,CV,n_offset,n_cons,n_blank,n_pre,n_ovl)
+                out_ = set_oto_line(wavfile,cv,n_offset,n_cons,n_blank,n_pre,n_ovl)
                 f_out.write(out_)
 
 
@@ -102,14 +104,16 @@ def is_head(alias):
 
     return alias.startswith("-")
 
+
 def is_vowel(str_):
 
     vowel = ["あ", "い", "う", "え", "お", "ん"]
     return str_ in vowel
 
-def set_oto_line(wavfile,CV,n_offset,n_cons,n_blank,n_pre,n_ovl):
 
-    return  "{}={},{},{},{},{},{}\n".format(wavfile,CV,n_offset,n_cons,n_blank,n_pre,n_ovl)
+def set_oto_line(wavfile,alias,offset,cons,blank,pre,ovl):
+
+    return  "{}={},{},{},{},{},{}\n".format(wavfile, alias, offset, cons, blank, pre, ovl)
 
 
 class OtoConverter(object):
@@ -119,22 +123,21 @@ class OtoConverter(object):
     def read_setting(self, setfile):
 
         params = {}
-        with open(setfile, "r", encoding="utf-8") as f:
+        with open(setfile, "r", encoding="sjis") as f:
 
             for line in f:
 
-                c_alias, old_alias, p1, p2, p3, p4 = line.split("=")
-                for oa in old_alias.split(","):
+                c_alias, org_alias, p1, p2, p3, p4 = line.split("=")
+                for oa in org_alias.split(","):
                     params[oa] = {"new_c": c_alias, "params": [int(tmp.strip()) for tmp in [p1, p2, p3, p4]]}
-
       
         return params
 
     def change_alias(self, s):        
         if self.params.get(s):
-            return  self.params.get(s).get("new_c")
+            return self.params.get(s).get("new_c")
 
-        return "nai"
+        return None
     
     def get_vclength(self, s):
         
@@ -144,7 +147,9 @@ class OtoConverter(object):
         return [-1, -1, -1, -1]
 
 
- 
-
 if __name__ == "__main__":
-    main()
+    if len(sys.argv) == 1:
+        print("引数に変換元ファイルを指定してください")
+        exit(1)
+
+    main(sys.argv[1])
