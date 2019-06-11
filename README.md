@@ -10,7 +10,7 @@ python vcv2cvvc.py input
 ```
 * input: 入力ファイルのパス
 
-変換後のvcv2cvvc.pyと同じパスに出力されます。(ファイル名: oto_cvvc.ini)
+変換後のファイルは、vcv2cvvc.pyと同じパスに出力されます。(ファイル名: oto_cvvc.ini)
 すでに同名のファイルが存在する場合は上書きされます。
 
 
