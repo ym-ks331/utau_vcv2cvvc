@@ -3,8 +3,10 @@
 import logging
 import re
 import sys
+import os
+import argparse
 
-LOG = logging.getLogger()
+LOG = logging.getLogger(__name__)
 LOG.setLevel(logging.WARN)
 
 fh = logging.FileHandler("log.txt", mode='a', encoding="utf-8", delay=False)
@@ -14,18 +16,37 @@ formatter = logging.Formatter(logformat)
 fh.setFormatter(formatter)
 LOG.addHandler(fh)
 
-def main(inputfile):
 
-    oc = OtoConverter()
 
-    with open(inputfile, "r", encoding="sjis") as f:
+def main():
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("input", help="Specify the conversion source oto.ini file.")
+    parser.add_argument("-s", dest="setting", default="setting.csv", 
+        help=("Specify the configuration file to be used for conversion. "
+            "The default value is 'setting.ini' which is the same location as the execution directory."))
+    args = parser.parse_args()
+
+
+    if os.path.exists(args.setting):
+        oc = OtoConverter(args.setting)
+    else:
+        LOG.error("setting file not exists: {}".format(args.setting))
+        print("指定された設定ファイルが存在しません")
+        sys.exit(1)
+
+    do_convert(args, oc)
+
+def do_convert(args, oc):
+
+    with open(args.input, "r", encoding="sjis") as f:
         with open("oto_cvvc.ini", "w", encoding="sjis") as f_out:
 
             for line in f:
                 wavfile, params = line.split("=")
                 # エイリアス, オフセット, 子音部, ブランク, 先行発声, オーバーラップ
-                alias, offset, cons, blank, pre, ovl = params.split(",")
-                offset, cons, blank, pre, ovl = [float(val.strip()) for val in [offset, cons, blank, pre, ovl]]
+                alias, offset, cons, cutoff, pre, ovl = params.split(",")
+                offset, cons, cutoff, pre, ovl = [float(val.strip()) for val in [offset, cons, cutoff, pre, ovl]]
 
                 # 先頭の場合 -> そのまま出力する
                 if is_head(alias):
@@ -69,32 +90,30 @@ def main(inputfile):
                     n_offset = round(offset - vcl[0])
                     n_pre = round(pre)
                     n_cons = n_pre
-                    n_blank = round(-(n_pre + vcl[1]))
+                    n_cutoff = round(-(n_pre + vcl[1]))
                     n_ovl = round(ovl)
 
-                    out_ = set_oto_line(wavfile,vc,n_offset,n_cons,n_blank,n_pre,n_ovl)
-                    f_out.write(out_)
+                    out = set_oto_line(wavfile,vc,n_offset,n_cons,n_cutoff,n_pre,n_ovl)
+                    f_out.write(out)
 
                 cvl = oc.get_vclength(cv)
                 
                 # CV
                 n_offset = round(offset + pre - cvl[2])
-                left = round( n_offset - offset)
+                left = round(n_offset - offset)
                 n_cons = round(cons-left) 
-                migi = round(blank)
-                n_blank = (0.0)
+                migi = round(cutoff)
 
-                if migi < (0.0):
-                    n_blank = round(migi + left)
+                if migi < 0:
+                    n_cutoff = round(migi + left)
                 else:
-                    n_blank = (blank) - left / 2
+                    n_cutoff = (cutoff) - left / 2
                 
-                n_pre = round((pre) - left)
+                n_pre = round(pre - left)
                 n_ovl = round(cvl[3])
                 
-                out_ = set_oto_line(wavfile,cv,n_offset,n_cons,n_blank,n_pre,n_ovl)
-                f_out.write(out_)
-
+                out = set_oto_line(wavfile,cv,n_offset,n_cons,n_cutoff,n_pre,n_ovl)
+                f_out.write(out)
 
 
 def is_head(alias):
@@ -111,9 +130,9 @@ def is_vowel(str_):
     return str_ in vowel
 
 
-def set_oto_line(wavfile,alias,offset,cons,blank,pre,ovl):
+def set_oto_line(wavfile,alias,offset,cons,cutoff,pre,ovl):
 
-    return  "{}={},{},{},{},{},{}\n".format(wavfile, alias, offset, cons, blank, pre, ovl)
+    return  "{}={},{},{},{},{},{}\n".format(wavfile, alias, offset, cons, cutoff, pre, ovl)
 
 
 class OtoConverter(object):
@@ -148,8 +167,6 @@ class OtoConverter(object):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) == 1:
-        print("引数に変換元ファイルを指定してください")
-        exit(1)
 
-    main(sys.argv[1])
+
+    main()
