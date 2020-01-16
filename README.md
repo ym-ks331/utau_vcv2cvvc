@@ -16,4 +16,4 @@ python vcv2cvvc.py input
 
 ### 作成環境
 * windows10
-* python3.7.3
+* python3.7.4

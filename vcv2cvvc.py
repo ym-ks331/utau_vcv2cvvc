@@ -5,6 +5,7 @@ import re
 import sys
 import os
 import argparse
+import csv
 
 LOG = logging.getLogger(__name__)
 LOG.setLevel(logging.WARN)
@@ -138,18 +139,25 @@ def set_oto_line(wavfile,alias,offset,cons,cutoff,pre,ovl):
 class OtoConverter(object):
     def __init__(self, setfile="setting.csv"):
         self.params = self.read_setting(setfile)
-
+        
     def read_setting(self, setfile):
+
+        f_params = ["p1", "p2", "p3", "p4"]
+        fields = ["c_alias"] + f_params
 
         params = {}
         with open(setfile, "r", encoding="sjis") as f:
 
-            for line in f:
+            settings = csv.DictReader(f, fieldnames=fields, restkey="org_alias")
 
-                c_alias, org_alias, p1, p2, p3, p4 = line.split("=")
-                for oa in org_alias.split(","):
-                    params[oa] = {"new_c": c_alias, "params": [int(tmp.strip()) for tmp in [p1, p2, p3, p4]]}
-      
+            for setting in settings:
+                for oa in setting["org_alias"]:
+                    if oa == "":
+                        continue
+                    params[oa] = {"new_c": setting["c_alias"]}
+                    for f_p in f_params:
+                        params[oa][f_p] = int(setting[f_p].strip())
+
         return params
 
     def change_alias(self, s):        
@@ -161,12 +169,10 @@ class OtoConverter(object):
     def get_vclength(self, s):
         
         if self.params.get(s):
-            return  self.params.get(s).get("params")
+            return  [self.params[s]["p1"], self.params[s]["p2"], self.params[s]["p3"], self.params[s]["p4"]]
 
         return [-1, -1, -1, -1]
 
 
 if __name__ == "__main__":
-
-
     main()
