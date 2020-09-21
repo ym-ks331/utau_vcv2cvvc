@@ -6,6 +6,7 @@ import sys
 import os
 import argparse
 import csv
+import collections
 
 LOG = logging.getLogger(__name__)
 LOG.setLevel(logging.WARN)
@@ -29,6 +30,9 @@ def main():
     parser.add_argument("-s", dest="setting", default="setting.csv", 
         help=("Specify the configuration file to be used for conversion. "
             "The default value is 'setting.ini' which is the same location as the execution directory."))
+    parser.add_argument("-n", dest="setnum", action="store_true", 
+        help=("Specify the configuration file to be used for conversion. "
+            "The default value is 'setting.ini' which is the same location as the execution directory."))
     args = parser.parse_args()
 
 
@@ -38,10 +42,12 @@ def main():
         LOG.error("setting file not exists: {}".format(args.setting))
         print("指定された設定ファイルが存在しません")
         sys.exit(1)
+    
+    ofw = OtoFileWriter(args.setnum)
 
-    do_convert(args, oc)
+    do_convert(args, oc, ofw)
 
-def do_convert(args, oc):
+def do_convert(args, oc, ofw):
 
     try:
         with open(args.input, "r", encoding="sjis") as f:
@@ -55,14 +61,14 @@ def do_convert(args, oc):
 
                     # 先頭の場合 -> そのまま出力する
                     if is_head(alias):
-                        f_out.write(line)
+                        ofw.oto_writer(f_out, line)
                         continue
 
                     try:
                         v,cv = alias.split(" ")
                     except ValueError:
                     # 分割できない場合 -> そのまま出力する
-                        f_out.write(line)
+                        ofw.oto_writer(f_out, line)
                         continue
 
                     # v-cvのc部分取り出す
@@ -70,7 +76,7 @@ def do_convert(args, oc):
 
                     if c is None:
                         LOG.warning("変換できませんでした: {}".format(alias))
-                        f_out.write(line)
+                        ofw.oto_writer(f_out, line)
                         continue
 
                     elif c == " ":
@@ -82,12 +88,12 @@ def do_convert(args, oc):
                     try:
                         vcl = oc.get_vclength(c)
                     except(GetParamsError): 
-                        f_out.write(line)                    
+                        ofw.oto_writer(f_out, line)                   
                         continue
 
                     # 母音の場合 -> そのまま出力 + V
                     if is_vowel(cv):
-                        f_out.write(line)
+                        ofw.oto_writer(f_out, line)
                         
                     else:
                         # VC
@@ -98,7 +104,7 @@ def do_convert(args, oc):
                         n_ovl = round(ovl)
 
                         out = set_oto_line(wavfile,vc,n_offset,n_cons,n_cutoff,n_pre,n_ovl)
-                        f_out.write(out)
+                        ofw.oto_writer(f_out, out)
 
                     cvl = oc.get_vclength(cv)
                     
@@ -117,12 +123,36 @@ def do_convert(args, oc):
                     n_ovl = round(cvl[3])
                     
                     out = set_oto_line(wavfile,cv,n_offset,n_cons,n_cutoff,n_pre,n_ovl)
-                    f_out.write(out)
+                    ofw.oto_writer(f_out, out)
 
     except(FileNotFoundError):
         errmes="指定されたファイルが存在しません: {}".format(args.input)
         print(errmes)
         LOG.exception(errmes)
+
+
+class OtoFileWriter(object):
+
+    def __init__(self, setnum=False):
+        self.setnum = setnum
+        self.alias_dict = collections.defaultdict(int)
+
+    def oto_writer(self, f_out, line):
+
+        if not self.setnum:
+            f_out.write(line)
+            return
+
+        wavfile, params = line.split("=")
+        alias, params_ = params.split(",", 1)
+        self.alias_dict[alias] += 1
+        
+        if self.alias_dict[alias] == 1:
+            line = "{}={},{}".format(wavfile, alias, params_)
+        else:
+            line = "{}={}{},{}".format(wavfile, alias, str(self.alias_dict[alias]), params_)
+
+        f_out.write(line)
 
 
 def is_head(alias):
