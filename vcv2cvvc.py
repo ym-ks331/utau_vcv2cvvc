@@ -30,9 +30,10 @@ def main():
     parser.add_argument("-s", dest="setting", default="setting.csv", 
         help=("Specify the configuration file to be used for conversion. "
             "The default value is 'setting.ini' which is the same location as the execution directory."))
-    parser.add_argument("-n", dest="setnum", action="store_true", 
-        help=("Specify the configuration file to be used for conversion. "
-            "The default value is 'setting.ini' which is the same location as the execution directory."))
+    parser.add_argument("-n", dest="setnum", action="store_true",
+        help=("重複するエイリアスに連番を振る場合に指定して下さい。"))
+    parser.add_argument("--limit", "-l", dest="limit", action="store", default=0, 
+        help=("連番の上限値を指定します。オプションを省略した場合は、上限値なしで動作します。"))
     args = parser.parse_args()
 
 
@@ -43,7 +44,7 @@ def main():
         print("指定された設定ファイルが存在しません")
         sys.exit(1)
     
-    ofw = OtoFileWriter(args.setnum)
+    ofw = OtoFileWriter(args.setnum, args.limit)
 
     do_convert(args, oc, ofw)
 
@@ -133,8 +134,9 @@ def do_convert(args, oc, ofw):
 
 class OtoFileWriter(object):
 
-    def __init__(self, setnum=False):
+    def __init__(self, setnum=False, limit=0):
         self.setnum = setnum
+        self.limit = int(limit)
         self.alias_dict = collections.defaultdict(int)
 
     def oto_writer(self, f_out, line):
@@ -149,8 +151,10 @@ class OtoFileWriter(object):
         
         if self.alias_dict[alias] == 1:
             line = "{}={},{}".format(wavfile, alias, params_)
+        elif self.limit and self.alias_dict[alias] > self.limit:
+            return 
         else:
-            line = "{}={}{},{}".format(wavfile, alias, str(self.alias_dict[alias]), params_)
+            line = "{}={}{},{}".format(wavfile, alias, self.alias_dict[alias], params_)
 
         f_out.write(line)
 
