@@ -150,11 +150,8 @@ class OtoFileWriter(object):
         self.limit = int(limit)
         self.alias_dict = collections.defaultdict(int)
         self.suffix = suffix
-    def write_oto(self, f_out, line):
 
-        if not self.setnum:
-            f_out.write(line)
-            return
+    def write_oto(self, f_out, line):
 
         wavfile, params = line.split("=")
         alias, params_ = params.split(",", 1)
@@ -164,8 +161,10 @@ class OtoFileWriter(object):
             line = f"{wavfile}={alias}{self.suffix},{params_}"
         elif self.limit and self.alias_dict[alias] > self.limit:
             return 
+        elif not self.setnum:
+            line = f"{wavfile}={alias}{self.suffix},{params_}"
         else:
-            line = f"{wavfile}={alias}{self.suffix}{self.alias_dict[alias]},{params_}"
+            line = f"{wavfile}={alias}{self.alias_dict[alias]}{self.suffix},{params_}"
 
         f_out.write(line)
 
