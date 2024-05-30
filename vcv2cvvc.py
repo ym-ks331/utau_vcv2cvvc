@@ -38,6 +38,8 @@ def main():
         help=("Set the upper limit value for sequential numbers."))
     parser.add_argument("--suffix", dest="suffix", action="store", default="", 
         help=("Set the suffix. It will not be given if the option is omitted."))
+    parser.add_argument("--cvvc-only", dest="cvvc_only", action="store_true", 
+        help=("If --cvvc-only is set, vcv phonemes will not be output."))
     args = parser.parse_args()
 
 
@@ -54,6 +56,7 @@ def main():
 
 def convert_alias(args, oc, ofw):
 
+    output_cvvc_only = args.cvvc_only
     try:
         with open(args.input, "r", encoding="sjis") as f:
             with open(args.output, "w", encoding="sjis") as f_out:
@@ -62,24 +65,27 @@ def convert_alias(args, oc, ofw):
                     wavfile, params = line.split("=")
                     # エイリアス, オフセット, 子音部, ブランク, 先行発声, オーバーラップ
                     alias, offset, cons, cutoff, pre, ovl = params.split(",")
+                    alias = alias.split(args.suffix)[0]
                     offset, cons, cutoff, pre, ovl = [float(val.strip()) for val in [offset, cons, cutoff, pre, ovl]]
 
                     # 先頭の場合 -> そのまま出力する
                     if is_head(alias):
-                        ofw.write_oto(f_out, line)
+                        if not output_cvvc_only:
+                            ofw.write_oto(f_out, line)
                         continue
 
                     try:
                         v,cv = alias.split(" ")
                     except ValueError:
                     # 分割できない場合 -> そのまま出力する
-                        ofw.write_oto(f_out, line)
-                        continue
+                        if output_cvvc_only:
+                            ofw.write_oto(f_out, line)
+                            continue
 
                     # v-cvのc部分取り出す
                     c = oc.change_alias(cv)
 
-                    if c is None:
+                    if c is None and not output_cvvc_only:
                         LOG.warning("Could not convert: {}".format(alias))
                         ofw.write_oto(f_out, line)
                         continue
@@ -93,11 +99,12 @@ def convert_alias(args, oc, ofw):
                     try:
                         vcl = oc.get_vclength(c)
                     except(GetParamsError): 
-                        ofw.write_oto(f_out, line)                   
+                        if not output_cvvc_only:
+                            ofw.write_oto(f_out, line)
                         continue
 
                     # 母音の場合 -> そのまま出力 + V
-                    if is_vowel(cv):
+                    if is_vowel(cv) and not output_cvvc_only:
                         ofw.write_oto(f_out, line)
                         
                     else:
@@ -143,7 +150,6 @@ class OtoFileWriter(object):
         self.limit = int(limit)
         self.alias_dict = collections.defaultdict(int)
         self.suffix = suffix
-
     def write_oto(self, f_out, line):
 
         if not self.setnum:
@@ -153,7 +159,7 @@ class OtoFileWriter(object):
         wavfile, params = line.split("=")
         alias, params_ = params.split(",", 1)
         self.alias_dict[alias] += 1
-        
+
         if self.alias_dict[alias] == 1:
             line = f"{wavfile}={alias}{self.suffix},{params_}"
         elif self.limit and self.alias_dict[alias] > self.limit:
