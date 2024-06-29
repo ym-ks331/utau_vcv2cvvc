@@ -65,7 +65,8 @@ def convert_alias(args, oc, ofw):
                     wavfile, params = line.split("=")
                     # エイリアス, オフセット, 子音部, ブランク, 先行発声, オーバーラップ
                     alias, offset, cons, cutoff, pre, ovl = params.split(",")
-                    alias = alias.split(args.suffix)[0]
+                    if args.suffix:
+                        alias = alias.split(args.suffix)[0]
                     offset, cons, cutoff, pre, ovl = [float(val.strip()) for val in [offset, cons, cutoff, pre, ovl]]
 
                     # 先頭の場合 -> そのまま出力する
